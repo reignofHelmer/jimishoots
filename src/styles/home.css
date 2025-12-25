@@ -1,0 +1,40 @@
+.hero {
+  min-height: 90vh;
+  width: 100%;
+  background-image: 
+    linear-gradient(
+      rgba(0, 0, 0, 0.6),
+      rgba(0, 0, 0, 0.6)
+    ),
+    url("../assets/bckg.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 0 20px;
+}
+
+.hero h1 {
+  font-size: 3rem;
+  max-width: 800px;
+}
+
+.hero p {
+  font-size: 1.2rem;
+  opacity: 0.9;
+}
+
+.cta {
+  margin-top: 20px;
+  padding: 14px 34px;
+  border: none;
+  background: #f5c542;
+  color: #000;
+  font-size: 1rem;
+  border-radius: 30px;
+}
