@@ -1,5 +1,5 @@
 import { Routes, Route } from "react-router-dom";
-import Navbar from "./components/Navbar";
+import Navbar from "./components/NavBar";
 import WhatsAppButton from "./components/WhatsAppButton";
 import Home from "./pages/Home";
 import Book from "./pages/Book";
