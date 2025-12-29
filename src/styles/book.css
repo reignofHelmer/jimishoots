@@ -1,93 +1,101 @@
 .book-page {
-  padding: 80px 20px;
-  max-width: 900px;
+  max-width: 1100px;
   margin: auto;
+  padding: 80px 20px;
+}
+
+.book-header {
   text-align: center;
+  margin-bottom: 50px;
 }
 
-.calendar-wrapper {
-  margin: 40px auto;
-  max-width: 400px;
-  position: relative;
+.book-calendar {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 60px;
 }
 
-/* Taken dates */
 .taken {
   background: #ff4d4d !important;
   color: white !important;
   border-radius: 50%;
 }
 
-/* Calendar overrides */
-.react-calendar {
-  border: none;
-  background: #ffffff;
-  color: rgb(0, 0, 0);
-  border-radius: 12px;
-  padding: 15px;
+.book-type {
+  margin-bottom: 50px;
 }
 
-.react-calendar button {
-  color: rgb(0, 0, 0);
+.session-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
 }
 
-.react-calendar__tile--active {
-  background: #f5c542 !important;
-  color: black !important;
-}
-
-.selected-date {
-  margin-top: 20px;
-  font-size: 1.1rem;
-}
-
-.booking-type {
-  margin-top: 40px;
-  display: flex;
-  justify-content: center;
-  gap: 30px;
-  flex-wrap: wrap;
-}
-
-.booking-type label {
+.session-card {
+  padding: 25px;
+  border-radius: 14px;
+  border: 1px solid #ddd;
   cursor: pointer;
-  font-size: 1rem;
+  text-align: center;
+  transition: 0.3s;
 }
 
-.booking-type input {
-  margin-right: 8px;
+.session-card.active {
+  border-color: #f5c542;
+  background: #fff7db;
 }
 
-.time-selection {
-  margin-top: 30px;
+.book-time {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 15px;
 }
 
-.time-selection select,
-.time-selection input {
+.book-time select,
+.book-time input {
   width: 300px;
   padding: 12px;
-  border-radius: 8px;
-  border: none;
-  outline: none;
-  font-size: 1rem;
+  border-radius: 10px;
+  border: 1px solid #ddd;
 }
 
-.booking-footer {
+.book-summary {
+  margin: 50px auto;
+  max-width: 400px;
+  padding: 25px;
+  border-radius: 14px;
+  background: #f9f9f9;
+  text-align: center;
+}
+
+.book-actions {
+  text-align: center;
   margin-top: 40px;
 }
 
-.hold-note {
-  margin-top: 10px;
-  font-size: 0.9rem;
-  opacity: 0.8;
+.timer {
+  margin-top: 15px;
+  color: #f5c542;
 }
 
-.hold-timer {
-  margin-top: 15px;
-  font-size: 1rem;
-  color: #f5c542;
+.success {
+  color: green;
+  font-weight: 600;
+}
+
+/* ---------------- MOBILE ---------------- */
+@media (max-width: 768px) {
+  .session-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .book-summary {
+    margin: 30px 0;
+  }
+
+  .book-time select,
+  .book-time input {
+    width: 100%;
+  }
 }

@@ -21,25 +21,20 @@ const Book = () => {
 
   const API_BASE = "http://localhost:5000";
 
-  // Fetch taken dates
+  /* ---------------- FETCH TAKEN DATES ---------------- */
   const fetchTakenDates = async () => {
     try {
       const res = await fetch(`${API_BASE}/api/bookings/taken`);
-      if (!res.ok) {
-        const text = await res.text();
-        console.error("Error fetching taken dates:", text);
-        return;
-      }
       const dates = await res.json();
       setTakenDates(dates);
     } catch (err) {
-      console.error("Network error fetching taken dates:", err);
+      console.error(err);
     }
   };
 
-  useEffect(() => {
-    fetchTakenDates();
-  }, []);
+  // useEffect(() => {
+  //   fetchTakenDates();
+  // }, []);
 
   const isTaken = (date) =>
     takenDates.includes(date.toISOString().split("T")[0]);
@@ -49,113 +44,75 @@ const Book = () => {
     setCustomTime("");
   };
 
-  const HOLD_DURATION = 2 * 60 * 60 * 1000; // 2 hours
-
-  // Dynamic pricing in Naira
+  /* ---------------- PRICING ---------------- */
   const getAmount = () => {
     switch (bookingType) {
       case "part":
-        return 5000; // ₦5,000
+        return 40000;
       case "half":
-        return 8000; // ₦8,000
+        return 80000;
       case "full":
-        return 12000; // ₦12,000
+        return 120000;
       default:
-        return 5000;
+        return 0;
     }
   };
 
-  // Hold booking
+  /* ---------------- HOLD BOOKING ---------------- */
   const holdBooking = async () => {
     if (!date || !bookingType || !timeSlot) {
-      alert("Please select date, booking type, and time before holding.");
+      alert("Please complete all selections.");
       return;
     }
 
-    try {
-      const res = await fetch(`${API_BASE}/api/bookings/hold`, {
+    const res = await fetch(`${API_BASE}/api/bookings/hold`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        date: date.toISOString(),
+        bookingType,
+        timeSlot,
+        customTime,
+        amount: getAmount(),
+      }),
+    });
+
+    const data = await res.json();
+    setCurrentBookingId(data.booking._id);
+    setHoldExpiresAt(data.booking.expiresAt);
+    fetchTakenDates();
+  };
+
+  /* ---------------- CONFIRM BOOKING ---------------- */
+  const confirmBooking = async (reference) => {
+    const res = await fetch(
+      `${API_BASE}/api/bookings/confirm/${currentBookingId}`,
+      {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date: date.toISOString(),
-          bookingType,
-          timeSlot,
-          customTime,
-          amount: getAmount(),
-        }),
-      });
-
-      if (!res.ok) {
-        const text = await res.text();
-        console.error("Error holding booking:", text);
-        throw new Error("Booking hold failed");
+        body: JSON.stringify({ reference }),
       }
+    );
 
-      const data = await res.json();
-      setCurrentBookingId(data.booking._id);
-      setHoldExpiresAt(data.booking.expiresAt);
-
-      fetchTakenDates();
-      alert("Booking held for 2 hours!");
-    } catch (err) {
-      console.error(err);
-      alert(err.message);
-    }
+    await res.json();
+    setPaid(true);
+    setCurrentBookingId(null);
+    setHoldExpiresAt(null);
+    setTimeLeft(null);
+    fetchTakenDates();
   };
 
-  // Confirm booking
-  const confirmBooking = async (paystackReference = null) => {
-    if (!currentBookingId) return;
-
-    try {
-      const res = await fetch(
-        `${API_BASE}/api/bookings/confirm/${currentBookingId}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reference: paystackReference }),
-        }
-      );
-
-      if (!res.ok) {
-        const text = await res.text();
-        console.error("Error confirming booking:", text);
-        throw new Error("Booking confirmation failed");
-      }
-
-      const data = await res.json();
-      console.log("Booking confirmed:", data);
-
-      setCurrentBookingId(null);
-      setHoldExpiresAt(null);
-      setTimeLeft(null);
-      setPaid(true);
-      alert("✅ Booking confirmed & paid successfully!");
-      fetchTakenDates();
-    } catch (err) {
-      console.error(err);
-      alert("❌ Payment verification failed: " + err.message);
-      setPaid(false);
-    } finally {
-      setLoadingPayment(false);
-    }
-  };
-
-  // Countdown timer
+  /* ---------------- COUNTDOWN ---------------- */
   useEffect(() => {
     if (!holdExpiresAt) return;
 
     const interval = setInterval(() => {
       const remaining = holdExpiresAt - Date.now();
-
       if (remaining <= 0) {
         clearInterval(interval);
         setHoldExpiresAt(null);
-        setTimeLeft(null);
         setCurrentBookingId(null);
         setPaid(false);
-        alert("Booking hold expired. Please book again.");
-        fetchTakenDates();
       } else {
         setTimeLeft(remaining);
       }
@@ -164,10 +121,8 @@ const Book = () => {
     return () => clearInterval(interval);
   }, [holdExpiresAt]);
 
-  // Paystack payment with dynamic Naira amount
+  /* ---------------- PAYSTACK ---------------- */
   const payAndConfirm = () => {
-    if (!currentBookingId) return;
-
     setLoadingPayment(true);
 
     const handler =
@@ -175,18 +130,14 @@ const Book = () => {
       window.PaystackPop.setup({
         key: "YOUR_PAYSTACK_PUBLIC_KEY",
         email: "customer@example.com",
-        amount: getAmount() * 100, // convert ₦ to kobo
+        amount: getAmount() * 100,
         currency: "NGN",
         ref: `${currentBookingId}-${Date.now()}`,
-        callback: async (response) => {
-          console.log("Paystack response:", response);
-          alert("Payment successful! Confirming booking...");
-          await confirmBooking(response.reference);
-        },
-        onClose: () => {
-          alert("Payment cancelled");
+        callback: (response) => {
+          confirmBooking(response.reference);
           setLoadingPayment(false);
         },
+        onClose: () => setLoadingPayment(false),
       });
 
     handler && handler.openIframe();
@@ -200,7 +151,7 @@ const Book = () => {
           <option>10–12</option>
           <option>1–3</option>
           <option>4–6</option>
-          <option value="custom">Custom time</option>
+          <option value="custom">Custom</option>
         </>
       );
     }
@@ -210,30 +161,31 @@ const Book = () => {
           <option value="">Select time</option>
           <option>7–12</option>
           <option>1–6</option>
-          <option value="custom">Custom time</option>
+          <option value="custom">Custom</option>
         </>
       );
     }
     if (bookingType === "full") {
       return (
         <>
-          <option value="">Select start time</option>
+          <option value="">Start time</option>
           <option>6:00 AM</option>
           <option>7:00 AM</option>
           <option>8:00 AM</option>
-          <option value="custom">Custom start time</option>
+          <option value="custom">Custom</option>
         </>
       );
     }
-    return null;
   };
 
   return (
     <div className="book-page">
-      <h1>Book a Session</h1>
-      <p>Select a date to get started</p>
+      <header className="book-header">
+        <h1>Book a Session</h1>
+        <p>Choose your preferred date and session type</p>
+      </header>
 
-      <div className="calendar-wrapper">
+      <section className="book-calendar">
         <Calendar
           onChange={(value) => {
             setDate(value);
@@ -246,88 +198,82 @@ const Book = () => {
           tileDisabled={({ date }) => isTaken(date)}
           tileClassName={({ date }) => (isTaken(date) ? "taken" : null)}
         />
-      </div>
+      </section>
 
       {date && (
-        <>
-          <div className="selected-date">
-            Selected Date: <strong>{date.toDateString()}</strong>
-          </div>
-
-          <div className="booking-type">
-            <h3>Choose booking type</h3>
-            {["part", "half", "full"].map((type) => (
-              <label key={type}>
-                <input
-                  type="radio"
-                  name="booking"
-                  value={type}
-                  onChange={(e) => {
-                    setBookingType(e.target.value);
-                    resetTimeSelection();
-                  }}
-                />
-                {type === "part"
-                  ? "Part-day"
-                  : type === "half"
-                  ? "Half-day"
-                  : "Full-day"}
-              </label>
+        <section className="book-type">
+          <h2>Select Session</h2>
+          <div className="session-grid">
+            {[
+              { id: "part", label: "Part Day", price: "₦40,000" },
+              { id: "half", label: "Half Day", price: "₦80,000" },
+              { id: "full", label: "Full Day", price: "₦120,000" },
+            ].map((s) => (
+              <div
+                key={s.id}
+                className={`session-card ${
+                  bookingType === s.id ? "active" : ""
+                }`}
+                onClick={() => {
+                  setBookingType(s.id);
+                  resetTimeSelection();
+                }}
+              >
+                <h3>{s.label}</h3>
+                <span>{s.price}</span>
+              </div>
             ))}
           </div>
-        </>
+        </section>
       )}
 
       {bookingType && (
-        <div className="time-selection">
-          <h3>Select time</h3>
+        <section className="book-time">
           <select value={timeSlot} onChange={(e) => setTimeSlot(e.target.value)}>
             {renderTimeOptions()}
           </select>
+
           {timeSlot === "custom" && (
             <input
-              type="text"
-              placeholder="Enter preferred time (e.g. 9:30 AM – 1 PM)"
+              placeholder="Enter preferred time"
               value={customTime}
               onChange={(e) => setCustomTime(e.target.value)}
             />
           )}
-        </div>
+        </section>
       )}
 
-      {timeSlot && !currentBookingId && (
-        <div className="booking-footer">
+      <aside className="book-summary">
+        <h3>Summary</h3>
+        <p>{date ? date.toDateString() : "No date selected"}</p>
+        <p>{bookingType || "No session selected"}</p>
+        <p>{timeSlot || "No time selected"}</p>
+        <strong>₦{getAmount().toLocaleString()}</strong>
+      </aside>
+
+      <footer className="book-actions">
+        {!currentBookingId && timeSlot && (
           <button className="cta" onClick={holdBooking}>
             Hold Booking
           </button>
-        </div>
-      )}
+        )}
 
-      {currentBookingId && !paid && (
-        <div className="booking-footer">
-          <button className="cta" onClick={payAndConfirm} disabled={loadingPayment}>
-            {loadingPayment ? "Processing Payment..." : "Pay & Confirm Booking (₦" + getAmount() + ")"}
-          </button>
-          {timeLeft && (
-            <p className="hold-timer">
-              ⏳ Time remaining:{" "}
-              <strong>
-                {Math.floor(timeLeft / 60000)}:
+        {currentBookingId && !paid && (
+          <>
+            <button className="cta" onClick={payAndConfirm}>
+              {loadingPayment ? "Processing..." : "Pay & Confirm"}
+            </button>
+            {timeLeft && (
+              <p className="timer">
+                ⏳ {Math.floor(timeLeft / 60000)}:
                 {String(Math.floor((timeLeft % 60000) / 1000)).padStart(2, "0")}
-              </strong>
-            </p>
-          )}
-          <p className="hold-note">
-            This booking is held for <strong>2 hours</strong> until payment & confirmation.
-          </p>
-        </div>
-      )}
+              </p>
+            )}
+          </>
+        )}
 
-      {paid && (
-        <div className="booking-footer">
-          <p>✅ Booking confirmed & paid!</p>
-        </div>
-      )}
+        {paid && <p className="success">Booking confirmed 🎉</p>}
+      </footer>
     </div>
   );
 };
