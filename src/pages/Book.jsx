@@ -1,279 +1,253 @@
 import { useState, useEffect } from "react";
 import Calendar from "react-calendar";
+import toast from "react-hot-toast";
 import "react-calendar/dist/Calendar.css";
 import "../styles/book.css";
 
+const API_BASE = "http://localhost:5000";
+
+/* ---------------- SESSION CONFIG (SOURCE OF TRUTH) ---------------- */
+const SESSIONS = {
+  "Part Day": {
+    price: 40000,
+    times: ["10:00 AM – 12:00 PM", "1:00 PM – 3:00 PM"]
+  },
+  "Half Day": {
+    price: 80000,
+    times: ["7:00 AM – 1:00 PM", "1:00 PM – 6:00 PM"]
+  },
+  "Full Day": {
+    price: 120000,
+    times: ["7:00 AM – 6:00 PM"]
+  }
+};
+
 const Book = () => {
+  const [step, setStep] = useState(1);
   const [date, setDate] = useState(null);
-  const [bookingType, setBookingType] = useState("");
-  const [timeSlot, setTimeSlot] = useState("");
+  const [session, setSession] = useState("");
+  const [time, setTime] = useState("");
   const [customTime, setCustomTime] = useState("");
-  const [timeLeft, setTimeLeft] = useState(null);
   const [takenDates, setTakenDates] = useState([]);
-  const [holdExpiresAt, setHoldExpiresAt] = useState(null);
+  const [lockedSlots, setLockedSlots] = useState([]);
   const [currentBookingId, setCurrentBookingId] = useState(null);
-  const [paid, setPaid] = useState(false);
   const [loadingPayment, setLoadingPayment] = useState(false);
+  const [paid, setPaid] = useState(false);
+
+  const [customer, setCustomer] = useState({
+    name: "",
+    email: "",
+    phone: ""
+  });
 
   const today = new Date();
   const maxDate = new Date();
   maxDate.setMonth(today.getMonth() + 3);
 
-  const API_BASE = "http://localhost:5000";
+  const amount = session ? SESSIONS[session].price : 0;
 
   /* ---------------- FETCH TAKEN DATES ---------------- */
-  const fetchTakenDates = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/api/bookings/taken`);
-      const dates = await res.json();
-      setTakenDates(dates);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  useEffect(() => {
+    fetch(`${API_BASE}/api/bookings/taken`)
+      .then(res => res.json())
+      .then(setTakenDates)
+      .catch(err => console.error(err));
+  }, []);
 
-  // useEffect(() => {
-  //   fetchTakenDates();
-  // }, []);
+  const isTaken = (d) =>
+    takenDates.includes(d.toISOString().split("T")[0]);
 
-  const isTaken = (date) =>
-    takenDates.includes(date.toISOString().split("T")[0]);
+  /* ---------------- FETCH LOCKED TIME SLOTS ---------------- */
+  useEffect(() => {
+    if (!date || !session) return;
 
-  const resetTimeSelection = () => {
-    setTimeSlot("");
-    setCustomTime("");
-  };
-
-  /* ---------------- PRICING ---------------- */
-  const getAmount = () => {
-    switch (bookingType) {
-      case "part":
-        return 40000;
-      case "half":
-        return 80000;
-      case "full":
-        return 120000;
-      default:
-        return 0;
-    }
-  };
+    fetch(
+      `${API_BASE}/api/bookings/slots?date=${date
+        .toISOString()
+        .split("T")[0]}&session=${session}`
+    )
+      .then(res => res.json())
+      .then(setLockedSlots)
+      .catch(err => console.error(err));
+  }, [date, session]);
 
   /* ---------------- HOLD BOOKING ---------------- */
   const holdBooking = async () => {
-    if (!date || !bookingType || !timeSlot) {
-      alert("Please complete all selections.");
+    if (!customer.name || !customer.email || !customer.phone) {
+      toast.error("Please fill in all customer details");
       return;
     }
 
-    const res = await fetch(`${API_BASE}/api/bookings/hold`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        date: date.toISOString(),
-        bookingType,
-        timeSlot,
-        customTime,
-        amount: getAmount(),
-      }),
-    });
-
-    const data = await res.json();
-    setCurrentBookingId(data.booking._id);
-    setHoldExpiresAt(data.booking.expiresAt);
-    fetchTakenDates();
-  };
-
-  /* ---------------- CONFIRM BOOKING ---------------- */
-  const confirmBooking = async (reference) => {
-    const res = await fetch(
-      `${API_BASE}/api/bookings/confirm/${currentBookingId}`,
-      {
+    try {
+      const res = await fetch(`${API_BASE}/api/bookings/hold`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reference }),
-      }
-    );
-
-    await res.json();
-    setPaid(true);
-    setCurrentBookingId(null);
-    setHoldExpiresAt(null);
-    setTimeLeft(null);
-    fetchTakenDates();
-  };
-
-  /* ---------------- COUNTDOWN ---------------- */
-  useEffect(() => {
-    if (!holdExpiresAt) return;
-
-    const interval = setInterval(() => {
-      const remaining = holdExpiresAt - Date.now();
-      if (remaining <= 0) {
-        clearInterval(interval);
-        setHoldExpiresAt(null);
-        setCurrentBookingId(null);
-        setPaid(false);
-      } else {
-        setTimeLeft(remaining);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [holdExpiresAt]);
-
-  /* ---------------- PAYSTACK ---------------- */
-  const payAndConfirm = () => {
-    setLoadingPayment(true);
-
-    const handler =
-      window.PaystackPop &&
-      window.PaystackPop.setup({
-        key: "YOUR_PAYSTACK_PUBLIC_KEY",
-        email: "customer@example.com",
-        amount: getAmount() * 100,
-        currency: "NGN",
-        ref: `${currentBookingId}-${Date.now()}`,
-        callback: (response) => {
-          confirmBooking(response.reference);
-          setLoadingPayment(false);
-        },
-        onClose: () => setLoadingPayment(false),
+        body: JSON.stringify({
+          date,
+          session,
+          timeSlot: time === "custom" ? customTime : time,
+          customer,
+          amount
+        })
       });
 
-    handler && handler.openIframe();
-  };
-
-  const renderTimeOptions = () => {
-    if (bookingType === "part") {
-      return (
-        <>
-          <option value="">Select time</option>
-          <option>10–12</option>
-          <option>1–3</option>
-          <option>4–6</option>
-          <option value="custom">Custom</option>
-        </>
-      );
-    }
-    if (bookingType === "half") {
-      return (
-        <>
-          <option value="">Select time</option>
-          <option>7–12</option>
-          <option>1–6</option>
-          <option value="custom">Custom</option>
-        </>
-      );
-    }
-    if (bookingType === "full") {
-      return (
-        <>
-          <option value="">Start time</option>
-          <option>6:00 AM</option>
-          <option>7:00 AM</option>
-          <option>8:00 AM</option>
-          <option value="custom">Custom</option>
-        </>
-      );
+      const data = await res.json();
+      setCurrentBookingId(data.booking._id);
+      toast.success("Booking held for 2 hours");
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to hold booking");
     }
   };
 
+  /* ---------------- PAYSTACK PAYMENT ---------------- */
+  const payAndConfirm = () => {
+    if (!currentBookingId) return;
+
+    setLoadingPayment(true);
+
+    const handler = window.PaystackPop.setup({
+      key: "YOUR_PAYSTACK_PUBLIC_KEY",
+      email: customer.email,
+      amount: amount * 100,
+      currency: "NGN",
+      ref: `${currentBookingId}-${Date.now()}`,
+      callback: () => {
+        setPaid(true);
+        setLoadingPayment(false);
+        toast.success("Payment successful! Booking confirmed.");
+      },
+      onClose: () => {
+        setLoadingPayment(false);
+        toast.error("Payment cancelled");
+      }
+    });
+
+    handler.openIframe();
+  };
+
+  /* ================= UI ================= */
   return (
-    <div className="book-page">
-      <header className="book-header">
-        <h1>Book a Session</h1>
-        <p>Choose your preferred date and session type</p>
-      </header>
+    <div className="book-container">
 
-      <section className="book-calendar">
+      {/* STEP 1 — DATE */}
+      <div className="card">
+        <h2>Book Portrait Session</h2>
+        <p className="subtitle">Select a date</p>
+
         <Calendar
-          onChange={(value) => {
-            setDate(value);
-            setBookingType("");
-            resetTimeSelection();
+          onChange={(d) => {
+            setDate(d);
+            setStep(2);
           }}
-          value={date}
           minDate={today}
           maxDate={maxDate}
           tileDisabled={({ date }) => isTaken(date)}
           tileClassName={({ date }) => (isTaken(date) ? "taken" : null)}
         />
-      </section>
+      </div>
 
-      {date && (
-        <section className="book-type">
-          <h2>Select Session</h2>
+      {/* STEP 2 — SESSION */}
+      {step >= 2 && date && (
+        <div className="card">
+          <h3>Choose Session</h3>
+
           <div className="session-grid">
-            {[
-              { id: "part", label: "Part Day", price: "₦40,000" },
-              { id: "half", label: "Half Day", price: "₦80,000" },
-              { id: "full", label: "Full Day", price: "₦120,000" },
-            ].map((s) => (
+            {Object.entries(SESSIONS).map(([type, data]) => (
               <div
-                key={s.id}
-                className={`session-card ${
-                  bookingType === s.id ? "active" : ""
-                }`}
+                key={type}
+                className={`session-card ${session === type ? "active" : ""}`}
                 onClick={() => {
-                  setBookingType(s.id);
-                  resetTimeSelection();
+                  setSession(type);
+                  setTime("");
+                  setCustomTime("");
+                  setStep(3);
                 }}
               >
-                <h3>{s.label}</h3>
-                <span>{s.price}</span>
+                <h4>{type}</h4>
+                <strong>₦{data.price.toLocaleString()}</strong>
               </div>
             ))}
           </div>
-        </section>
+        </div>
       )}
 
-      {bookingType && (
-        <section className="book-time">
-          <select value={timeSlot} onChange={(e) => setTimeSlot(e.target.value)}>
-            {renderTimeOptions()}
+      {/* STEP 3 — TIME */}
+      {step >= 3 && session && (
+        <div className="card">
+          <h3>Select Time Slot</h3>
+
+          <select value={time} onChange={e => setTime(e.target.value)}>
+            <option value="">Choose time</option>
+            {SESSIONS[session].times.map(t => (
+              <option key={t} disabled={lockedSlots.includes(t)}>
+                {t} {lockedSlots.includes(t) && "(Booked)"}
+              </option>
+            ))}
+            <option value="custom">Custom</option>
           </select>
 
-          {timeSlot === "custom" && (
+          {time === "custom" && (
             <input
-              placeholder="Enter preferred time"
+              placeholder="Enter custom time"
               value={customTime}
-              onChange={(e) => setCustomTime(e.target.value)}
+              onChange={e => setCustomTime(e.target.value)}
             />
           )}
-        </section>
+
+          {(time || customTime) && (
+            <button className="next-btn" onClick={() => setStep(4)}>
+              Next →
+            </button>
+          )}
+        </div>
       )}
 
-      <aside className="book-summary">
-        <h3>Summary</h3>
-        <p>{date ? date.toDateString() : "No date selected"}</p>
-        <p>{bookingType || "No session selected"}</p>
-        <p>{timeSlot || "No time selected"}</p>
-        <strong>₦{getAmount().toLocaleString()}</strong>
-      </aside>
+      {/* STEP 4 — SUMMARY & PAYMENT */}
+      {step === 4 && (
+        <div className="card">
+          <h3>Booking Summary</h3>
 
-      <footer className="book-actions">
-        {!currentBookingId && timeSlot && (
-          <button className="cta" onClick={holdBooking}>
-            Hold Booking
-          </button>
-        )}
+          <div className="summary">
+            <p><strong>Date:</strong> {date.toDateString()}</p>
+            <p><strong>Session:</strong> {session}</p>
+            <p><strong>Time:</strong> {time === "custom" ? customTime : time}</p>
+            <p><strong>Total:</strong> ₦{amount.toLocaleString()}</p>
+          </div>
 
-        {currentBookingId && !paid && (
-          <>
-            <button className="cta" onClick={payAndConfirm}>
+          <input
+            placeholder="Full Name"
+            value={customer.name}
+            onChange={e => setCustomer({ ...customer, name: e.target.value })}
+          />
+          <input
+            placeholder="Email Address"
+            value={customer.email}
+            onChange={e => setCustomer({ ...customer, email: e.target.value })}
+          />
+          <input
+            placeholder="Phone Number"
+            value={customer.phone}
+            onChange={e => setCustomer({ ...customer, phone: e.target.value })}
+          />
+
+          {!currentBookingId ? (
+            <button className="next-btn" onClick={holdBooking}>
+              Hold Booking
+            </button>
+          ) : (
+            <button
+              className="primary-btn"
+              onClick={payAndConfirm}
+              disabled={loadingPayment}
+            >
               {loadingPayment ? "Processing..." : "Pay & Confirm"}
             </button>
-            {timeLeft && (
-              <p className="timer">
-                ⏳ {Math.floor(timeLeft / 60000)}:
-                {String(Math.floor((timeLeft % 60000) / 1000)).padStart(2, "0")}
-              </p>
-            )}
-          </>
-        )}
+          )}
 
-        {paid && <p className="success">Booking confirmed 🎉</p>}
-      </footer>
+          {paid && <p className="success">✅ Booking confirmed!</p>}
+        </div>
+      )}
     </div>
   );
 };

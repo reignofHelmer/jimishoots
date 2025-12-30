@@ -5,6 +5,7 @@ import Home from "./pages/Home";
 import Book from "./pages/Book";
 import Contact from "./pages/Contact";
 import Chatbot from "./components/Chatbot";
+import { Toaster } from "react-hot-toast";
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
 
       <WhatsAppButton />
       <Chatbot />
+      <Toaster position="top-center" reverseOrder={false} />
     </>
   );
 }
