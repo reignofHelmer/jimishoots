@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
-import Calendar from "react-calendar";
 import toast from "react-hot-toast";
-import "react-calendar/dist/Calendar.css";
 import "../styles/book.css";
 
 const API_BASE = "http://localhost:5000";
 
-/* ---------------- SESSION CONFIG (SOURCE OF TRUTH) ---------------- */
+/* ---------------- SESSION CONFIG ---------------- */
 const SESSIONS = {
   "Part Day": {
     price: 40000,
@@ -22,6 +20,113 @@ const SESSIONS = {
   }
 };
 
+/* ---------------- CUSTOM CALENDAR ---------------- */
+const CustomCalendar = ({ selectedDate, onSelect, takenDates }) => {
+  const today = new Date();
+  const maxDate = new Date();
+  maxDate.setMonth(today.getMonth() + 3);
+
+  const [currentMonth, setCurrentMonth] = useState(
+    new Date(today.getFullYear(), today.getMonth(), 1)
+  );
+
+  const daysInMonth = new Date(
+    currentMonth.getFullYear(),
+    currentMonth.getMonth() + 1,
+    0
+  ).getDate();
+
+  const startDay = new Date(
+    currentMonth.getFullYear(),
+    currentMonth.getMonth(),
+    1
+  ).getDay();
+
+  const isDisabled = (day) => {
+    const date = new Date(
+      currentMonth.getFullYear(),
+      currentMonth.getMonth(),
+      day
+    );
+    const iso = date.toISOString().split("T")[0];
+    return date < today || date > maxDate || takenDates.includes(iso);
+  };
+
+  return (
+    <div className="calendar-card">
+      <div className="calendar-header">
+        <button
+          onClick={() =>
+            setCurrentMonth(
+              new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1)
+            )
+          }
+        >
+          ←
+        </button>
+
+        <h4>
+          {currentMonth.toLocaleString("default", {
+            month: "long",
+            year: "numeric"
+          })}
+        </h4>
+
+        <button
+          onClick={() =>
+            setCurrentMonth(
+              new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1)
+            )
+          }
+        >
+          →
+        </button>
+      </div>
+
+      <div className="weekdays">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => (
+          <span key={d}>{d}</span>
+        ))}
+      </div>
+
+      <div className="days-grid">
+        {Array.from({ length: startDay }).map((_, i) => (
+          <span key={`empty-${i}`} />
+        ))}
+
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const day = i + 1;
+          const disabled = isDisabled(day);
+          const dateObj = new Date(
+            currentMonth.getFullYear(),
+            currentMonth.getMonth(),
+            day
+          );
+
+          return (
+            <button
+              key={day}
+              disabled={disabled}
+              className={
+                selectedDate &&
+                dateObj.toDateString() === selectedDate.toDateString()
+                  ? "active"
+                  : ""
+              }
+              onClick={() => { onSelect(dateObj);
+                toast.success("Date selected: " + dateObj.toDateString());
+              }}
+            >
+              {day}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/* ================= BOOK PAGE ================= */
 const Book = () => {
   const [step, setStep] = useState(1);
   const [date, setDate] = useState(null);
@@ -30,9 +135,7 @@ const Book = () => {
   const [customTime, setCustomTime] = useState("");
   const [takenDates, setTakenDates] = useState([]);
   const [lockedSlots, setLockedSlots] = useState([]);
-  const [currentBookingId, setCurrentBookingId] = useState(null);
-  const [loadingPayment, setLoadingPayment] = useState(false);
-  const [paid, setPaid] = useState(false);
+  const [paid] = useState(false);
 
   const [customer, setCustomer] = useState({
     name: "",
@@ -40,24 +143,17 @@ const Book = () => {
     phone: ""
   });
 
-  const today = new Date();
-  const maxDate = new Date();
-  maxDate.setMonth(today.getMonth() + 3);
-
   const amount = session ? SESSIONS[session].price : 0;
 
-  /* ---------------- FETCH TAKEN DATES ---------------- */
+  /* FETCH TAKEN DATES */
   useEffect(() => {
     fetch(`${API_BASE}/api/bookings/taken`)
       .then(res => res.json())
       .then(setTakenDates)
-      .catch(err => console.error(err));
+      .catch(console.error);
   }, []);
 
-  const isTaken = (d) =>
-    takenDates.includes(d.toISOString().split("T")[0]);
-
-  /* ---------------- FETCH LOCKED TIME SLOTS ---------------- */
+  /* FETCH LOCKED SLOTS */
   useEffect(() => {
     if (!date || !session) return;
 
@@ -68,65 +164,9 @@ const Book = () => {
     )
       .then(res => res.json())
       .then(setLockedSlots)
-      .catch(err => console.error(err));
+      .catch(console.error);
   }, [date, session]);
 
-  /* ---------------- HOLD BOOKING ---------------- */
-  const holdBooking = async () => {
-    if (!customer.name || !customer.email || !customer.phone) {
-      toast.error("Please fill in all customer details");
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API_BASE}/api/bookings/hold`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          date,
-          session,
-          timeSlot: time === "custom" ? customTime : time,
-          customer,
-          amount
-        })
-      });
-
-      const data = await res.json();
-      setCurrentBookingId(data.booking._id);
-      toast.success("Booking held for 2 hours");
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to hold booking");
-    }
-  };
-
-  /* ---------------- PAYSTACK PAYMENT ---------------- */
-  const payAndConfirm = () => {
-    if (!currentBookingId) return;
-
-    setLoadingPayment(true);
-
-    const handler = window.PaystackPop.setup({
-      key: "YOUR_PAYSTACK_PUBLIC_KEY",
-      email: customer.email,
-      amount: amount * 100,
-      currency: "NGN",
-      ref: `${currentBookingId}-${Date.now()}`,
-      callback: () => {
-        setPaid(true);
-        setLoadingPayment(false);
-        toast.success("Payment successful! Booking confirmed.");
-      },
-      onClose: () => {
-        setLoadingPayment(false);
-        toast.error("Payment cancelled");
-      }
-    });
-
-    handler.openIframe();
-  };
-
-  /* ================= UI ================= */
   return (
     <div className="book-container">
 
@@ -135,20 +175,18 @@ const Book = () => {
         <h2>Book Portrait Session</h2>
         <p className="subtitle">Select a date</p>
 
-        <Calendar
-          onChange={(d) => {
+        <CustomCalendar
+          selectedDate={date}
+          takenDates={takenDates}
+          onSelect={(d) => {
             setDate(d);
             setStep(2);
           }}
-          minDate={today}
-          maxDate={maxDate}
-          tileDisabled={({ date }) => isTaken(date)}
-          tileClassName={({ date }) => (isTaken(date) ? "taken" : null)}
         />
       </div>
 
       {/* STEP 2 — SESSION */}
-      {step >= 2 && date && (
+      {step >= 2 && (
         <div className="card">
           <h3>Choose Session</h3>
 
@@ -162,6 +200,7 @@ const Book = () => {
                   setTime("");
                   setCustomTime("");
                   setStep(3);
+                  toast.success("Session selected: " + type);
                 }}
               >
                 <h4>{type}</h4>
@@ -173,7 +212,7 @@ const Book = () => {
       )}
 
       {/* STEP 3 — TIME */}
-      {step >= 3 && session && (
+      {step >= 3 && (
         <div className="card">
           <h3>Select Time Slot</h3>
 
@@ -184,7 +223,7 @@ const Book = () => {
                 {t} {lockedSlots.includes(t) && "(Booked)"}
               </option>
             ))}
-            <option value="custom">Custom</option>
+            <option className="custom" value="custom">Custom</option>
           </select>
 
           {time === "custom" && (
@@ -195,15 +234,21 @@ const Book = () => {
             />
           )}
 
-          {(time || customTime) && (
-            <button className="next-btn" onClick={() => setStep(4)}>
-              Next →
-            </button>
-          )}
+            {(time || customTime) && (
+              <button
+                className="next-btn"
+                onClick={() => {
+                  setStep(4);
+                  toast.success("Time locked");
+                }}
+              >
+                Continue
+              </button>
+            )}
         </div>
       )}
 
-      {/* STEP 4 — SUMMARY & PAYMENT */}
+      {/* STEP 4 — SUMMARY */}
       {step === 4 && (
         <div className="card">
           <h3>Booking Summary</h3>
@@ -231,19 +276,10 @@ const Book = () => {
             onChange={e => setCustomer({ ...customer, phone: e.target.value })}
           />
 
-          {!currentBookingId ? (
-            <button className="next-btn" onClick={holdBooking}>
-              Hold Booking
-            </button>
-          ) : (
-            <button
-              className="primary-btn"
-              onClick={payAndConfirm}
-              disabled={loadingPayment}
-            >
-              {loadingPayment ? "Processing..." : "Pay & Confirm"}
-            </button>
-          )}
+          <button className="primary-btn" 
+          onClick={() => toast.success("Proceeding to payment")}>
+            Pay & Confirm
+          </button>
 
           {paid && <p className="success">✅ Booking confirmed!</p>}
         </div>

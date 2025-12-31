@@ -1,5 +1,5 @@
 .hero {
-  min-height: 90vh;
+  min-height: 100vh;
   width: 100%;
   background-image: 
     linear-gradient(
@@ -29,6 +29,7 @@
   font-size: 1.2rem;
   opacity: 0.9;
   color: #fff;
+  margin-top: -30px;
 }
 
 .cta {
@@ -92,7 +93,7 @@
 }
 
 .bio-card img {
-  width: 100%;
+  max-width: 100%;
   height: 100%;
   object-fit: cover;
   border-radius: 16px;
@@ -205,6 +206,7 @@
   padding: 6rem 8%;
   align-items: center;
   background-color: #ECE7DF;
+  max-width: 100%;
 }
 
 .steps-content h2 {
@@ -224,9 +226,10 @@
 .steps-card {
   border-radius: 20px;
   padding: 0.5rem;
-  width: 120%;
+  width: 100%;
   height: 100%;
   border-radius: 10px;
+  margin-left: -40px;
 }
 
 .steps-card h2 {
@@ -377,6 +380,7 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 3rem;
   margin-bottom: 3rem;
+  text-align: center;
 }
 
 .footer-brand h3,

@@ -7,7 +7,7 @@ const Navbar = () => {
     <nav className="navbar">
       <Link to="/" className="logo">
         <Camera size={28} />
-        <span>jimishoots</span>
+        <span>JIMISHOOTS</span>
       </Link>
 
       <ul className="nav-links">

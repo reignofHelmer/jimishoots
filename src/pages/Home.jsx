@@ -26,8 +26,8 @@ const Home = () => {
   return (
     <>
     <section className="hero fade-in">
-      <h1>Photography that <br /> feels like you</h1>
-      <p>Portraits, weddings and commercial sessions — curated, effortless, and made to last.</p>
+      <h1>Photography <br /> That Feels <br /> <i>Like You</i></h1>
+      <p>Portraits, weddings and commercial sessions <br /> curated, effortless, and made to last.</p>
       <button className="cta" onClick={() => navigate("/book")}>Book a Session</button>
       <button className="cta" onClick={() => navigate("/portfolio")}>View Portfolio</button>
     </section>
@@ -53,7 +53,7 @@ const Home = () => {
 
       <div className="bio-card fade-in">
         <img
-          src="/images/download.jpg"
+          src="public/images/download.jpg"
           alt="Portrait of the photographer"
         />
       </div>
@@ -83,7 +83,7 @@ const Home = () => {
           </div>
 
           <div className="service-card">
-            <img src="/images/wedding.png" alt="Wedding photography" />
+            <img src="/public/images/wedding.png" alt="Wedding photography" />
             <h3>Weddings & Events</h3>
             <p>
               Full-day & micro weddings — every precious moment preserved.
@@ -95,7 +95,7 @@ const Home = () => {
           </div>
 
           <div className="service-card">
-            <img src="/images/commercial.png" alt="Commercial photography" />
+            <img src="/public/images/commercial.png" alt="Commercial photography" />
             <h3>Commercial & Product</h3>
             <p>
               Brand photography for web, socials, and print campaigns.
