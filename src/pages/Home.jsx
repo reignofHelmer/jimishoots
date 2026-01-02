@@ -26,10 +26,24 @@ const Home = () => {
   return (
     <>
     <section className="hero fade-in">
-      <h1>Photography <br /> That Feels <br /> <i>Like You</i></h1>
-      <p>Portraits, weddings and commercial sessions <br /> curated, effortless, and made to last.</p>
-      <button className="cta" onClick={() => navigate("/book")}>Book a Session</button>
-      <button className="cta" onClick={() => navigate("/portfolio")}>View Portfolio</button>
+      <h1>
+        Photography <br /> That Feels <br /> <i>Like You</i>
+      </h1>
+      
+      <p>
+        Portraits, weddings and commercial sessions <br />
+        curated, effortless, and made to last.
+      </p>
+      
+      <div className="hero-cta">
+        <button className="cta" onClick={() => navigate("/book")}>
+          Book a Session
+        </button>
+      
+        <button className="cta-prim" onClick={() => navigate("/portfolio")}>
+          View Portfolio
+        </button>
+      </div>
     </section>
 
     <section className="bio-section fade-in">
