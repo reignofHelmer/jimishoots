@@ -53,6 +53,7 @@ const CustomCalendar = ({ selectedDate, onSelect, takenDates }) => {
   };
 
   return (
+       
     <div className="calendar-card">
       <div className="calendar-header">
         <button
@@ -169,6 +170,19 @@ const Book = () => {
 
   return (
     <div className="book-container">
+      {/* BACKGROUND VIDEO */}
+      <video
+        className="booking-video"
+        autoPlay
+        muted
+        loop
+        playsInline
+      >
+        <source src="/booking-bg.mp4" type="video/mp4" />
+      </video>
+
+      <div className="video-overlay" />
+
 
       {/* STEP 1 — DATE */}
       <div className="card">

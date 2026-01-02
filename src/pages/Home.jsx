@@ -53,7 +53,7 @@ const Home = () => {
 
       <div className="bio-card fade-in">
         <img
-          src="public/images/download.jpg"
+          src="images/download.png"
           alt="Portrait of the photographer"
         />
       </div>
@@ -83,7 +83,7 @@ const Home = () => {
           </div>
 
           <div className="service-card">
-            <img src="/public/images/wedding.png" alt="Wedding photography" />
+            <img src="/images/wedding.png" alt="Wedding photography" />
             <h3>Weddings & Events</h3>
             <p>
               Full-day & micro weddings — every precious moment preserved.
@@ -95,7 +95,7 @@ const Home = () => {
           </div>
 
           <div className="service-card">
-            <img src="/public/images/commercial.png" alt="Commercial photography" />
+            <img src="/images/commercial.png" alt="Commercial photography" />
             <h3>Commercial & Product</h3>
             <p>
               Brand photography for web, socials, and print campaigns.

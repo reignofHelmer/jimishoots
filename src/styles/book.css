@@ -1,3 +1,48 @@
+/* ================= VIDEO BACKGROUND ================= */
+.booking-video {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  z-index: -2;
+}
+
+/* DARK OVERLAY */
+.video-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: -1;
+}
+
+/* CONTENT ABOVE VIDEO */
+.booking-content {
+  position: relative;
+  z-index: 2;
+}
+
+
+@keyframes fadeIn {
+  from { opacity: 0 }
+  to { opacity: 1 }
+}
+
+@media (max-width: 768px) {
+  .bg-video {
+    display: none;
+  }
+
+  .booking-page {
+    background: url("/assets/booking-bg.jpg") center/cover no-repeat;
+  }
+}
+
+
 .book-container {
   max-width: 420px;
   margin: auto;
