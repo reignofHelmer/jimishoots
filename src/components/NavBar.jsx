@@ -15,7 +15,7 @@ const Navbar = () => {
       <ul className="nav-links">
         <li><Link to="/">Home</Link></li>
         <li><Link to="/portfolio">Portfolio</Link></li>
-        <li><Link to="/book">Book</Link></li>
+        <li><Link to="/contact">Contact</Link></li>
       </ul>
 
       {/* CTA */}

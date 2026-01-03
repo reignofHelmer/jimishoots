@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import { usePaystackPayment } from "react-paystack";
 import "../styles/book.css";
 
 
@@ -138,8 +139,8 @@ const Book = () => {
   const [takenDates, setTakenDates] = useState([]);
   const [lockedSlots, setLockedSlots] = useState([]);
   const [paid] = useState(false);
-  const [bookingId, setBookingId] = useState(null);
   const [loadingPayment, setLoadingPayment] = useState(false);
+  const [bookingId, setBookingId] = useState(null);
   const [success, setSuccess] = useState(false);
 
   const [customer, setCustomer] = useState({
@@ -148,7 +149,57 @@ const Book = () => {
     phone: ""
   });
 
-  const amount = session ? SESSIONS[session].price : 0;
+const amount = session ? SESSIONS[session].price : 0;
+
+const paystackConfig = {
+  reference: Date.now().toString(),
+  email: customer.email,
+  amount: amount * 100,
+  publicKey: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+};
+
+const onPaymentSuccess = async (reference) => {
+  try {
+    toast.success("Payment successful. Verifying...");
+
+    const res = await fetch(
+      `${API_BASE}/api/bookings/confirm/${bookingId}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          reference: reference.reference
+        })
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      toast.error(data.message || "Verification failed");
+      return;
+    }
+
+    toast.success("🎉 Booking confirmed!");
+    setSuccess(true);
+
+  } catch (err) {
+    console.error(err);
+    toast.error("Verification error");
+  }
+};
+
+const onPaymentClose = () => {
+  toast.error("Payment cancelled");
+};
+
+const initializePayment = usePaystackPayment(paystackConfig);
+
+const handlePayNow = () => {
+  initializePayment(onPaymentSuccess, onPaymentClose);
+};
+
+  
 
   /* FETCH TAKEN DATES */
   useEffect(() => {
@@ -159,18 +210,18 @@ const Book = () => {
   }, []);
 
   /* FETCH LOCKED SLOTS */
-  useEffect(() => {
-    if (!date || !session) return;
+  // useEffect(() => {
+  //   if (!date || !session) return;
 
-    fetch(
-      `${API_BASE}/api/bookings/slots?date=${date
-        .toISOString()
-        .split("T")[0]}&session=${session}`
-    )
-      .then(res => res.json())
-      .then(setLockedSlots)
-      .catch(console.error);
-  }, [date, session]);
+  //   fetch(
+  //     `${API_BASE}/api/bookings/slots?date=${date
+  //       .toISOString()
+  //       .split("T")[0]}&session=${session}`
+  //   )
+  //     .then(res => res.json())
+  //     .then(setLockedSlots)
+  //     .catch(console.error);
+  // }, [date, session]);
 
   return (
     <div className="book-container">
@@ -294,78 +345,54 @@ const Book = () => {
             onChange={e => setCustomer({ ...customer, phone: e.target.value })}
           />
 
-          <button
-            className="primary-btn"
-            disabled={loadingPayment}
-            onClick={async () => {
-              if (!customer.name || !customer.email || !customer.phone) {
-                toast.error("Please fill in all details");
+        <button
+          className="primary-btn"
+          disabled={loadingPayment}
+          onClick={async () => {
+            if (!customer.name || !customer.email || !customer.phone) {
+              toast.error("Please fill in all details");
+              return;
+            }
+          
+            try {
+              setLoadingPayment(true);
+            
+              const res = await fetch(`${API_BASE}/api/bookings/hold`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  date: date.toISOString(),
+                  bookingType: session,
+                  timeSlot: time === "custom" ? null : time,
+                  customTime: time === "custom" ? customTime : null,
+                  amount,
+                  customer
+                })
+              });
+            
+              const data = await res.json();
+            
+              if (!res.ok) {
+                toast.error(data.message || "Booking failed");
+                setLoadingPayment(false);
                 return;
               }
             
-              try {
-                setLoadingPayment(true);
-              
-                const res = await fetch(`${API_BASE}/api/bookings/hold`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    date: date.toISOString(),
-                    bookingType: session,
-                    timeSlot: time === "custom" ? null : time,
-                    customTime: time === "custom" ? customTime : null,
-                    amount,
-                    customer
-                  })
-
-                });
-              
-                const data = await res.json();
-              
-                if (!res.ok) {
-                  toast.error(data.message || "Booking failed");
-                  setLoadingPayment(false);
-                  return;
-                }
-              
-                setBookingId(data.booking._id);
-                toast.success("Booking reserved. Proceeding to payment...");
-                
-
-                const handler = window.PaystackPop.setup({
-                  key: "pk_test_xxxxxxxxxxxxx", // PUBLIC KEY (NOT SECRET)
-                  email: customer.email,
-                  amount: amount * 100, // kobo
-                  currency: "NGN",
-                  ref: `JIMI_${Date.now()}`,
-                  callback: async (response) => {
-                    toast.success("Payment successful! Verifying...");
-                  
-                    await fetch(`${API_BASE}/api/bookings/confirm/${data.booking._id}`, {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ reference: response.reference })
-                    });
-                  
-                    toast.success("Booking confirmed 🎉");
-                  },
-                  onClose: () => {
-                    toast.error("Payment cancelled");
-                  }
-                });
-
-                handler.openIframe();
-
-              } catch (err) {
-                console.error(err);
-                toast.error("Something went wrong");
-              } finally {
-                setLoadingPayment(false);
-              }
-            }}
-          >
-            {loadingPayment ? "Reserving..." : "Pay & Confirm"}
-          </button>
+              setBookingId(data.booking._id);
+              toast.success("Booking reserved. Opening payment...");
+            
+              handlePayNow();
+            
+            } catch (err) {
+              console.error(err);
+              toast.error("Something went wrong");
+            } finally {
+              setLoadingPayment(false);
+            }
+          }}
+        >
+          {loadingPayment ? "Processing..." : "Pay & Confirm"}
+        </button>
 
           {paid && <p className="success">✅ Booking confirmed!</p>}
           {success && (

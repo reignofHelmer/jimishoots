@@ -27,12 +27,12 @@ const Home = () => {
     <>
     <section className="hero fade-in">
       <h1>
-        Photography <br /> That Feels <br /> <i>Like You</i>
+        <small> Photography <br /> That Feels <br /> <i>Like You</i> </small>
       </h1>
       
       <p>
-        Portraits, weddings and commercial sessions <br />
-        curated, effortless, and made to last.
+        Portraits, weddings and commercial sessions curated, <br />
+        effortless, and made to last.
       </p>
       
       <div className="hero-cta">
