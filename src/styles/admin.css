@@ -1,0 +1,28 @@
+.admin-page {
+  padding: 80px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 30px;
+}
+
+th, td {
+  padding: 14px;
+  border-bottom: 1px solid #ddd;
+  text-align: left;
+}
+
+th {
+  background: #f5c542;
+}
+
+.confirmed {
+  color: green;
+  font-weight: 600;
+}
+
+.held {
+  color: orange;
+}

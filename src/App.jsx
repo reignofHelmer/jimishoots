@@ -6,6 +6,7 @@ import Book from "./pages/Book";
 import Contact from "./pages/Contact";
 import Chatbot from "./components/Chatbot";
 import { Toaster } from "react-hot-toast";
+import Admin from "./pages/Admin";
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/book" element={<Book />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/admin" element={<Admin />} />
       </Routes>
 
       <WhatsAppButton />
