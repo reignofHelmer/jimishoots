@@ -3,7 +3,6 @@ import toast from "react-hot-toast";
 import { usePaystackPayment } from "react-paystack";
 import "../styles/book.css";
 
-
 const API_BASE = "http://localhost:5000";
 
 /* ---------------- SESSION CONFIG ---------------- */
@@ -23,7 +22,7 @@ const SESSIONS = {
 };
 
 /* ---------------- CUSTOM CALENDAR ---------------- */
-const CustomCalendar = ({ selectedDate, onSelect, takenDates }) => {
+const CustomCalendar = ({ selectedDate, onSelect }) => {
   const today = new Date();
   const maxDate = new Date();
   maxDate.setMonth(today.getMonth() + 3);
@@ -50,12 +49,11 @@ const CustomCalendar = ({ selectedDate, onSelect, takenDates }) => {
       currentMonth.getMonth(),
       day
     );
-    const iso = date.toISOString().split("T")[0];
-    return date < today || date > maxDate || takenDates.includes(iso);
+    // Only disable past dates, not future dates
+    return date < today || date > maxDate;
   };
 
   return (
-       
     <div className="calendar-card">
       <div className="calendar-header">
         <button
@@ -116,7 +114,8 @@ const CustomCalendar = ({ selectedDate, onSelect, takenDates }) => {
                   ? "active"
                   : ""
               }
-              onClick={() => { onSelect(dateObj);
+              onClick={() => {
+                onSelect(dateObj);
                 toast.success("Date selected: " + dateObj.toDateString());
               }}
             >
@@ -136,7 +135,6 @@ const Book = () => {
   const [session, setSession] = useState("");
   const [time, setTime] = useState("");
   const [customTime, setCustomTime] = useState("");
-  const [takenDates, setTakenDates] = useState([]);
   const [lockedSlots, setLockedSlots] = useState([]);
   const [paid] = useState(false);
   const [loadingPayment, setLoadingPayment] = useState(false);
@@ -149,79 +147,107 @@ const Book = () => {
     phone: ""
   });
 
-const amount = session ? SESSIONS[session].price : 0;
+  const amount = session ? SESSIONS[session].price : 0;
 
-const paystackConfig = {
-  reference: Date.now().toString(),
-  email: customer.email,
-  amount: amount * 100,
-  publicKey: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
-};
+  const paystackConfig = {
+    reference: Date.now().toString(),
+    email: customer.email,
+    amount: amount * 100,
+    publicKey: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+  };
 
-const onPaymentSuccess = async (reference) => {
-  try {
-    toast.success("Payment successful. Verifying...");
+  const onPaymentSuccess = async (reference) => {
+    try {
+      toast.success("Payment successful. Verifying...");
 
-    const res = await fetch(
-      `${API_BASE}/api/bookings/confirm/${bookingId}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          reference: reference.reference
-        })
+      const res = await fetch(
+        `${API_BASE}/api/bookings/confirm/${bookingId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            reference: reference.reference
+          })
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.message || "Verification failed");
+        return;
       }
-    );
 
-    const data = await res.json();
+      toast.success("🎉 Booking confirmed!");
+      setSuccess(true);
 
-    if (!res.ok) {
-      toast.error(data.message || "Verification failed");
-      return;
+    } catch (err) {
+      console.error(err);
+      toast.error("Verification error");
+    }
+  };
+
+  const onPaymentClose = () => {
+    toast.error("Payment cancelled");
+  };
+
+  const initializePayment = usePaystackPayment(paystackConfig);
+
+  const handlePayNow = () => {
+    initializePayment(onPaymentSuccess, onPaymentClose);
+  };
+
+  /* FETCH LOCKED SLOTS for selected date */
+  useEffect(() => {
+    if (!date) return;
+
+    fetch(
+      `${API_BASE}/api/bookings/slots?date=${date.toISOString().split("T")[0]}`
+    )
+      .then(res => res.json())
+      .then(slots => {
+        // Extract just the time slot strings
+        setLockedSlots(slots.map(s => s.timeSlot));
+      })
+      .catch(console.error);
+  }, [date, session]);
+
+  // ✅ Validate custom time
+  const validateCustomTime = (timeStr) => {
+    if (!timeStr) return true;
+    
+    const timeRegex = /(\d{1,2}):(\d{2})\s*(AM|PM)/gi;
+    const matches = [...timeStr.matchAll(timeRegex)];
+    
+    if (matches.length === 0) {
+      toast.error("Invalid time format. Use format like '2:00 PM - 5:00 PM'");
+      return false;
     }
 
-    toast.success("🎉 Booking confirmed!");
-    setSuccess(true);
+    // Convert to 24-hour
+    const convertTo24 = (hour, minute, period) => {
+      let h = parseInt(hour);
+      if (period.toUpperCase() === 'PM' && h !== 12) h += 12;
+      if (period.toUpperCase() === 'AM' && h === 12) h = 0;
+      return h + (parseInt(minute) / 60);
+    };
 
-  } catch (err) {
-    console.error(err);
-    toast.error("Verification error");
-  }
-};
+    const times = matches.map(m => convertTo24(m[1], m[2], m[3]));
+    const start = Math.min(...times);
+    const end = Math.max(...times);
 
-const onPaymentClose = () => {
-  toast.error("Payment cancelled");
-};
+    if (start < 7) {
+      toast.error("Bookings cannot start before 7:00 AM");
+      return false;
+    }
+    
+    if (end > 21) {
+      toast.error("Bookings cannot end after 9:00 PM");
+      return false;
+    }
 
-const initializePayment = usePaystackPayment(paystackConfig);
-
-const handlePayNow = () => {
-  initializePayment(onPaymentSuccess, onPaymentClose);
-};
-
-  
-
-  /* FETCH TAKEN DATES */
-  useEffect(() => {
-    fetch(`${API_BASE}/api/bookings/taken`)
-      .then(res => res.json())
-      .then(setTakenDates)
-      .catch(console.error);
-  }, []);
-
-  /* FETCH LOCKED SLOTS */
-  // useEffect(() => {
-  //   if (!date || !session) return;
-
-  //   fetch(
-  //     `${API_BASE}/api/bookings/slots?date=${date
-  //       .toISOString()
-  //       .split("T")[0]}&session=${session}`
-  //   )
-  //     .then(res => res.json())
-  //     .then(setLockedSlots)
-  //     .catch(console.error);
-  // }, [date, session]);
+    return true;
+  };
 
   return (
     <div className="book-container">
@@ -238,15 +264,13 @@ const handlePayNow = () => {
 
       <div className="video-overlay" />
 
-
       {/* STEP 1 — DATE */}
       <div className="card">
         <h2>Book Portrait Session</h2>
-        <p className="subtitle">Select a date</p>
+        <p className="subtitle">Select a date (multiple bookings per day allowed)</p>
 
         <CustomCalendar
           selectedDate={date}
-          takenDates={takenDates}
           onSelect={(d) => {
             setDate(d);
             setStep(2);
@@ -284,36 +308,56 @@ const handlePayNow = () => {
       {step >= 3 && (
         <div className="card">
           <h3>Select Time Slot</h3>
+          <p className="time-note">⏰ Available hours: 7:00 AM - 9:00 PM</p>
+
+          {lockedSlots.length > 0 && (
+            <div className="locked-info">
+              <p>⚠️ Already booked for {date.toDateString()}:</p>
+              <ul>
+                {lockedSlots.map((slot, i) => (
+                  <li key={i}>{slot}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <select value={time} onChange={e => setTime(e.target.value)}>
             <option value="">Choose time</option>
             {SESSIONS[session].times.map(t => (
-              <option key={t} disabled={lockedSlots.includes(t)}>
-                {t} {lockedSlots.includes(t) && "(Booked)"}
+              <option key={t} value={t} disabled={lockedSlots.includes(t)}>
+                {t} {lockedSlots.includes(t) && "❌ (Booked)"}
               </option>
             ))}
-            <option className="custom" value="custom">Custom</option>
+            <option className="custom" value="custom">✏️ Custom Time</option>
           </select>
 
           {time === "custom" && (
-            <input
-              placeholder="Enter custom time"
-              value={customTime}
-              onChange={e => setCustomTime(e.target.value)}
-            />
+            <>
+              <input
+                placeholder="e.g., 2:00 PM - 5:00 PM"
+                value={customTime}
+                onChange={e => setCustomTime(e.target.value)}
+              />
+              <small style={{ color: '#999', marginTop: '8px', display: 'block' }}>
+                Format: "HH:MM AM/PM - HH:MM AM/PM" (between 7:00 AM and 9:00 PM)
+              </small>
+            </>
           )}
 
-            {(time || customTime) && (
-              <button
-                className="next-btn"
-                onClick={() => {
-                  setStep(4);
-                  toast.success("Time locked");
-                }}
-              >
-                Continue
-              </button>
-            )}
+          {(time || customTime) && (
+            <button
+              className="next-btn"
+              onClick={() => {
+                if (time === "custom" && !validateCustomTime(customTime)) {
+                  return;
+                }
+                setStep(4);
+                toast.success("Time slot selected");
+              }}
+            >
+              Continue
+            </button>
+          )}
         </div>
       )}
 
@@ -345,63 +389,62 @@ const handlePayNow = () => {
             onChange={e => setCustomer({ ...customer, phone: e.target.value })}
           />
 
-        <button
-          className="primary-btn"
-          disabled={loadingPayment}
-          onClick={async () => {
-            if (!customer.name || !customer.email || !customer.phone) {
-              toast.error("Please fill in all details");
-              return;
-            }
-          
-            try {
-              setLoadingPayment(true);
-            
-              const res = await fetch(`${API_BASE}/api/bookings/hold`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  date: date.toISOString(),
-                  bookingType: session,
-                  timeSlot: time === "custom" ? null : time,
-                  customTime: time === "custom" ? customTime : null,
-                  amount,
-                  customer
-                })
-              });
-            
-              const data = await res.json();
-            
-              if (!res.ok) {
-                toast.error(data.message || "Booking failed");
-                setLoadingPayment(false);
+          <button
+            className="primary-btn"
+            disabled={loadingPayment}
+            onClick={async () => {
+              if (!customer.name || !customer.email || !customer.phone) {
+                toast.error("Please fill in all details");
                 return;
               }
-            
-              setBookingId(data.booking._id);
-              toast.success("Booking reserved. Opening payment...");
-            
-              handlePayNow();
-            
-            } catch (err) {
-              console.error(err);
-              toast.error("Something went wrong");
-            } finally {
-              setLoadingPayment(false);
-            }
-          }}
-        >
-          {loadingPayment ? "Processing..." : "Pay & Confirm"}
-        </button>
+
+              try {
+                setLoadingPayment(true);
+
+                const res = await fetch(`${API_BASE}/api/bookings/hold`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    date: date.toISOString().split("T")[0],
+                    bookingType: session,
+                    timeSlot: time === "custom" ? null : time,
+                    customTime: time === "custom" ? customTime : null,
+                    amount,
+                    customer
+                  })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                  toast.error(data.message || "Booking failed");
+                  setLoadingPayment(false);
+                  return;
+                }
+
+                setBookingId(data.booking._id);
+                toast.success("Time slot reserved! Opening payment...");
+
+                handlePayNow();
+
+              } catch (err) {
+                console.error(err);
+                toast.error("Something went wrong");
+              } finally {
+                setLoadingPayment(false);
+              }
+            }}
+          >
+            {loadingPayment ? "Processing..." : "Pay & Confirm"}
+          </button>
 
           {paid && <p className="success">✅ Booking confirmed!</p>}
           {success && (
-          <div className="success-card">
-            <h3>🎉 Booking Confirmed</h3>
-            <p>We’ve sent a receipt to {customer.email}</p>
-          </div>
-        )}
-
+            <div className="success-card">
+              <h3>🎉 Booking Confirmed</h3>
+              <p>We've sent a receipt to {customer.email}</p>
+            </div>
+          )}
         </div>
       )}
     </div>
