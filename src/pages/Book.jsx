@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { usePaystackPayment } from "react-paystack";
 import "../styles/book.css";
 
 const API_BASE = "http://localhost:5000";
@@ -149,52 +148,51 @@ const Book = () => {
 
   const amount = session ? SESSIONS[session].price : 0;
 
-  const paystackConfig = {
-    reference: Date.now().toString(),
-    email: customer.email,
-    amount: amount * 100,
-    publicKey: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
-  };
-
-  const onPaymentSuccess = async (reference) => {
-    try {
-      toast.success("Payment successful. Verifying...");
-
-      const res = await fetch(
-        `${API_BASE}/api/bookings/confirm/${bookingId}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            reference: reference.reference
-          })
-        }
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.message || "Verification failed");
-        return;
-      }
-
-      toast.success("🎉 Booking confirmed!");
-      setSuccess(true);
-
-    } catch (err) {
-      console.error(err);
-      toast.error("Verification error");
+    const handlePayNow = () => {
+    if (!window.PaystackPop) {
+      toast.error("Paystack not loaded");
+      return;
     }
-  };
-
-  const onPaymentClose = () => {
-    toast.error("Payment cancelled");
-  };
-
-  const initializePayment = usePaystackPayment(paystackConfig);
-
-  const handlePayNow = () => {
-    initializePayment(onPaymentSuccess, onPaymentClose);
+  
+    const handler = window.PaystackPop.setup({
+      key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+      email: customer.email,
+      amount: amount * 100,
+      currency: "NGN",
+      ref: `JS_${Date.now()}`,
+      callback: async (response) => {
+        try {
+          toast.success("Payment successful. Verifying...");
+        
+          const res = await fetch(
+            `${API_BASE}/api/bookings/confirm/${bookingId}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ reference: response.reference }),
+            }
+          );
+        
+          const data = await res.json();
+        
+          if (!res.ok) {
+            toast.error(data.message || "Verification failed");
+            return;
+          }
+        
+          toast.success("🎉 Booking confirmed!");
+          setSuccess(true);
+        } catch (err) {
+          console.error(err);
+          toast.error("Verification error");
+        }
+      },
+      onClose: () => {
+        toast.error("Payment cancelled");
+      },
+    });
+  
+    handler.openIframe();
   };
 
   /* FETCH LOCKED SLOTS for selected date */
